@@ -9,8 +9,9 @@ handler to support [tus](http://tus.io/) resumable uploads
 (make-handler opts)
 ````
 
-* `opts`
-** `:save-dir`: Path to save location, the path must be writable by the
+### `opts`
+
+* `:save-dir` Path to save location, the path must be writable by the
 user running the HTTP service.
 
 ## License
