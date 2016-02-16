@@ -4,4 +4,5 @@
   :license {:name "Mozilla Public License 2.0"
             :url "https://www.mozilla.org/en-US/MPL/2.0/"}
   :dependencies [[org.clojure/clojure "1.7.0"]]
-  :profiles {:dev {:dependencies [[ring/ring-mock "0.3.0"]]}})
+  :profiles {:dev {:resource-paths ["test/resources"]
+                   :dependencies [[ring/ring-mock "0.3.0"]]}})
