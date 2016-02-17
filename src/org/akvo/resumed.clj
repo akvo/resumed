@@ -43,7 +43,15 @@
 
 (defmethod handle-request :head
   [req opts]
-  {:status 200})
+  (let [upload-id (last (str/split (:uri req) #"/"))]
+    (if-let [found (@current-uploads upload-id)]
+      {:status 200
+       :headers (assoc tus-headers
+                       "Upload-Offset" (:offset found)
+                       "Upload-Length" (:length found)
+                       "Upload-Metadata" (:metadata found))}
+      {:status 404
+       :body "Not Found"})))
 
 (defmethod handle-request :patch
   [req opts]
@@ -66,7 +74,6 @@
 (defn get-location
   "Get Location string from request"
   [req]
-  ;; <scheme>://<host>:<port><uri>
   (format "%s://%s%s%s"
           (name (:scheme req))
           (:server-name req)
@@ -76,11 +83,14 @@
             "")
           (:uri req)))
 
-(defn get-upload-length [req]
-  (let [ul (get-header req "upload-length")]
-    (if ul
+(defn get-upload-length
+  "Returns a number based on the Upload-Length
+  request header"
+  [req]
+  (let [len (get-header req "upload-length")]
+    (if len
       (try
-        (Long/valueOf ^String ul)
+        (Long/valueOf ^String len)
         (catch Exception _
           -1))
       -1)))
@@ -95,7 +105,7 @@
             um (get-header req "upload-metadata")
             fname (or (get-filename um)  id)
             fpath (str (:save-path opts) "/" id)]
-        (swap! current-uploads assoc id {:offset 0 :filename fname :upload-length len :upload-metadata um})
+        (swap! current-uploads assoc id {:offset 0 :filename fname :length len :metadata um})
         (.mkdirs (File. fpath))
         (.createNewFile (File. (str fpath "/" fname)))
         {:status 201

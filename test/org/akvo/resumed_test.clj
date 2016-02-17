@@ -8,11 +8,11 @@
 (defn file-to-ba
   "Reads a file to a byte array
   Attribution: http://stackoverflow.com/a/26791567"
-  [path]
+  [path off len]
   (let [f (io/file path)
-        ba (byte-array (.length f))
+        ba (byte-array len)
         is (io/input-stream f)]
-    (.read is ba)
+    (.read is ba off len)
     (.close is)
     ba))
 
@@ -56,3 +56,20 @@
       (is (= true (.exists (File. (str tmpdir "/" upload-id)))))
       (is (= 0 (.length (File. (str tmpdir "/" upload-id "/world_domination_plan.pdf")))))
       (is (= um metadata)))))
+
+(deftest test-good-head
+  (let [handler (make-handler)
+        um "filename cGcxMS50eHQ="
+        len 167518
+        post (-> (m/request :post "http://localhost:3000/files")
+                 (m/header "Upload-Metadata" um)
+                 (m/header "Upload-Length" len))
+        resp (handler post)
+        head (-> (m/request :head (get-in resp [:headers "Location"]))
+                 (m/header "Tus-Version" "1.0.0"))
+        resp (handler head)]
+    (testing "HEAD"
+      (is (= 200 (:status resp)))
+      (is (= len (get-in resp [:headers "Upload-Length"])))
+      (is (= um (get-in resp [:headers "Upload-Metadata"])))
+      (is (zero? (get-in resp [:headers "Upload-Offset"]))))))
