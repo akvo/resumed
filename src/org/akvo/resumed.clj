@@ -85,7 +85,7 @@
                         fos (FileOutputStream. (:file found) true)]
               (io/copy (:body req) tmp)
               (.write fos (.toByteArray tmp))
-              (swap! current-uploads update-in [id :offset] + off len)
+              (swap! current-uploads update-in [id :offset] + len)
               {:status 204
                :headers (assoc tus-headers
                                "Upload-Offset" (:offset (@current-uploads id)))}))))

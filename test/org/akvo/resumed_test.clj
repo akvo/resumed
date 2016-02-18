@@ -81,7 +81,7 @@
       (is (= um (get-in resp [:headers "Upload-Metadata"])))
       (is (zero? (get-in resp [:headers "Upload-Offset"]))))))
 
-(deftest good-patch
+(deftest patch-single-request
   (let [handler (make-handler)
         um "filename cGcxMS50eHQ="
         ba (res-to-byte-array "resources/pg11.txt")
@@ -97,6 +97,34 @@
                   (m/header "Upload-Offset" 0)
                   (m/body ba))
         resp (handler patch)]
-    (testing "PATCH"
+    (testing "PATCH in single request"
       (is (= 204 (:status resp)))
       (is (= len (get-in resp [:headers "Upload-Offset"]))))))
+
+(deftest patch-multiple-requests
+  (let [handler (make-handler)
+        um "filename cGcxMS50eHQ="
+        ba (res-to-byte-array "resources/pg11.txt")
+        len (count ba)
+        size 1024
+        post (-> (m/request :post "http://localhost:3000/files")
+                 (m/header "Upload-Metadata" um)
+                 (m/header "Upload-Length" len))
+        resp (handler post)
+        location (get-in resp [:headers "Location"])
+        parts (partition-all size ba)]
+    (testing "PATCH multiple requests"
+      (loop [offset 0
+             data parts]
+        (when (seq data)
+          (let [body (first data)
+                rlen (count body)
+                patch (-> (m/request :patch location)
+                          (m/header "Content-Type" "application/offset+octet-stream")
+                          (m/header "Content-Length" rlen)
+                          (m/header "Upload-Offset" offset)
+                          (m/body (byte-array body)))
+                resp (handler patch)]
+            (is (= 204 (:status resp)))
+            (is (= (+ offset rlen) (get-in resp [:headers "Upload-Offset"]))))
+          (recur (+ offset (count (first data))) (rest data)))))))
