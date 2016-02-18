@@ -5,7 +5,7 @@
 (ns org.akvo.resumed
   (:require [clojure.string :as str]
             [clojure.java.io :as io])
-  (:import java.io.File
+  (:import [java.io File FileOutputStream ByteArrayOutputStream]
            java.util.UUID
            javax.xml.bind.DatatypeConverter))
 
@@ -81,8 +81,8 @@
           (if (not= (:offset found) off)
             {:status 409
              :body "Conflict"}
-            (with-open [tmp (java.io.ByteArrayOutputStream.)
-                        fos (java.io.FileOutputStream. (:file found) true)]
+            (with-open [tmp (ByteArrayOutputStream.)
+                        fos (FileOutputStream. (:file found) true)]
               (io/copy (:body req) tmp)
               (.write fos (.toByteArray tmp))
               (swap! current-uploads update-in [id :offset] + off len)
