@@ -5,16 +5,23 @@
             [clojure.java.io :as io])
   (:import java.io.File))
 
-(defn file-to-ba
-  "Reads a file to a byte array
+(defn res-to-byte-array
+  "Reads a resource file to a byte array
   Attribution: http://stackoverflow.com/a/26791567"
-  [path off len]
-  (let [f (io/file path)
+  ([path off len]
+   (let [f (io/file (io/resource path))
         ba (byte-array len)
         is (io/input-stream f)]
     (.read is ba off len)
     (.close is)
     ba))
+  ([path]
+   (let [f (io/file (io/resource path))
+        ba (byte-array (.length f))
+        is (io/input-stream f)]
+    (.read is ba)
+    (.close is)
+    ba)))
 
 (deftest test-utilities
   (testing "Testing utility functions"
@@ -73,3 +80,23 @@
       (is (= len (get-in resp [:headers "Upload-Length"])))
       (is (= um (get-in resp [:headers "Upload-Metadata"])))
       (is (zero? (get-in resp [:headers "Upload-Offset"]))))))
+
+(deftest good-patch
+  (let [handler (make-handler)
+        um "filename cGcxMS50eHQ="
+        ba (res-to-byte-array "resources/pg11.txt")
+        len (count ba)
+        post (-> (m/request :post "http://localhost:3000/files")
+                 (m/header "Upload-Metadata" um)
+                 (m/header "Upload-Length" len))
+        resp (handler post)
+        location (get-in resp [:headers "Location"])
+        patch (-> (m/request :patch location)
+                  (m/header "Content-Type" "application/offset+octet-stream")
+                  (m/header "Content-Length" len)
+                  (m/header "Upload-Offset" 0)
+                  (m/body ba))
+        resp (handler patch)]
+    (testing "PATCH"
+      (is (= 204 (:status resp)))
+      (is (= len (get-in resp [:headers "Upload-Offset"]))))))

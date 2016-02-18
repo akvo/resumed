@@ -3,7 +3,8 @@
 ;; file, You can obtain one at https://mozilla.org/MPL/2.0/
 
 (ns org.akvo.resumed
-  (:require [clojure.string :as str])
+  (:require [clojure.string :as str]
+            [clojure.java.io :as io])
   (:import java.io.File
            java.util.UUID
            javax.xml.bind.DatatypeConverter))
@@ -27,6 +28,19 @@
 
 (defn get-header [req header]
   (get-in req [:headers (.toLowerCase ^String header)]))
+
+
+
+(defn to-number
+  "Returns a numeric representation of a String.
+  Returns -1 on unparseable String, blank or nil"
+  [s]
+  (if (not (str/blank? s))
+    (try
+      (Long/valueOf ^String s)
+      (catch Exception _
+        -1))
+    -1))
 
 (defmulti handle-request
   (fn [req opts]
@@ -55,7 +69,29 @@
 
 (defmethod handle-request :patch
   [req opts]
-  {:status 204})
+  (let [id (last (str/split (:uri req) #"/"))
+        found (@current-uploads id)]
+    (if found
+      (let [len (-> req (get-header "content-length") to-number)
+            off (-> req (get-header "upload-offset") to-number)
+            ct (get-header req "content-type")]
+        (if (not= "application/offset+octet-stream" ct)
+          {:status 400 ;; FIXME: is this the right code?
+           :body "Bad request"}
+          (if (not= (:offset found) off)
+            {:status 409
+             :body "Conflict"}
+            (with-open [tmp (java.io.ByteArrayOutputStream.)
+                        fos (java.io.FileOutputStream. (:file found) true)]
+              (io/copy (:body req) tmp)
+              (.write fos (.toByteArray tmp))
+              (swap! current-uploads update-in [id :offset] + off len)
+              {:status 204
+               :headers (assoc tus-headers
+                               "Upload-Offset" (:offset (@current-uploads id)))}))))
+      {:status 404
+       :body "Not Found"})))
+
 
 (defn get-filename
   "Returns a file name decoding a base64 string of
@@ -83,31 +119,21 @@
             "")
           (:uri req)))
 
-(defn get-upload-length
-  "Returns a number based on the Upload-Length
-  request header"
-  [req]
-  (let [len (get-header req "upload-length")]
-    (if len
-      (try
-        (Long/valueOf ^String len)
-        (catch Exception _
-          -1))
-      -1)))
 
 (defmethod handle-request :post
   [req opts]
-  (let [len (get-upload-length req)]
+  (let [len (-> req (get-header "upload-length") to-number)]
     (if (> len (tus-headers "Tus-Max-Size"))
       {:status 413
        :body "Request Entity Loo Large"}
       (let [id (gen-id)
             um (get-header req "upload-metadata")
             fname (or (get-filename um)  id)
-            fpath (str (:save-path opts) "/" id)]
-        (swap! current-uploads assoc id {:offset 0 :filename fname :length len :metadata um})
+            fpath (str (:save-path opts) "/" id)
+            f (str fpath "/" fname)]
+        (swap! current-uploads assoc id {:offset 0 :file f :length len :metadata um})
         (.mkdirs (File. fpath))
-        (.createNewFile (File. (str fpath "/" fname)))
+        (.createNewFile (File. f))
         {:status 201
          :headers {"Location" (str (get-location req) "/" id)
                    "Upload-Length" len  ;FIXME: potentially -1
