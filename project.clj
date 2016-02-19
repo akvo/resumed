@@ -4,5 +4,12 @@
   :license {:name "Mozilla Public License 2.0"
             :url "https://www.mozilla.org/en-US/MPL/2.0/"}
   :dependencies [[org.clojure/clojure "1.7.0"]]
+  :repositories [["jcenter" {:url "http://jcenter.bintray.com"
+                             :snapshots false
+                             :checksum :fail
+                             :update :always}]]
   :profiles {:dev {:resource-paths ["test/resources"]
-                   :dependencies [[ring/ring-mock "0.3.0"]]}})
+                   :dependencies [[ring/ring-core "1.4.0"]
+                                  [ring/ring-jetty-adapter "1.4.0"]
+                                  [ring/ring-mock "0.3.0"]
+                                  [io.tus.java.client/tus-java-client "0.1.4"]]}})
