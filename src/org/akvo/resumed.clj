@@ -13,7 +13,7 @@
   {"Tus-Resumable" "1.0.0"
    "Tus-Version" "1.0.0"
    "Tus-Extension" "creation"
-   "Tus-Max-Size" (* 1024 1024 50)})
+   "Tus-Max-Size" (str (* 1024 1024 50))})
 
 (defonce current-uploads (atom {}))
 
@@ -61,13 +61,13 @@
     (if-let [found (@current-uploads upload-id)]
       {:status 200
        :headers (assoc tus-headers
-                       "Upload-Offset" (:offset found)
-                       "Upload-Length" (:length found)
+                       "Upload-Offset" (str (:offset found))
+                       "Upload-Length" (str (:length found))
                        "Upload-Metadata" (:metadata found))}
       {:status 404
        :body "Not Found"})))
 
-(defmethod handle-request :patch
+(defn patch
   [req opts]
   (let [id (last (str/split (:uri req) #"/"))
         found (@current-uploads id)]
@@ -88,9 +88,13 @@
               (swap! current-uploads update-in [id :offset] + len)
               {:status 204
                :headers (assoc tus-headers
-                               "Upload-Offset" (:offset (@current-uploads id)))}))))
+                               "Upload-Offset" (str (:offset (@current-uploads id))))}))))
       {:status 404
        :body "Not Found"})))
+
+(defmethod handle-request :patch
+  [req opts]
+  (patch req opts))
 
 
 (defn get-filename
@@ -119,16 +123,15 @@
             "")
           (:uri req)))
 
-
-(defmethod handle-request :post
+(defn post
   [req opts]
   (let [len (-> req (get-header "upload-length") to-number)]
-    (if (> len (tus-headers "Tus-Max-Size"))
+    (if (> len (to-number (tus-headers "Tus-Max-Size")))
       {:status 413
        :body "Request Entity Loo Large"}
       (let [id (gen-id)
             um (get-header req "upload-metadata")
-            fname (or (get-filename um)  id)
+            fname (or (get-filename um)  "file")
             fpath (str (:save-path opts) "/" id)
             f (str fpath "/" fname)]
         (swap! current-uploads assoc id {:offset 0 :file f :length len :metadata um})
@@ -136,9 +139,16 @@
         (.createNewFile (File. f))
         {:status 201
          :headers {"Location" (str (get-location req) "/" id)
-                   "Upload-Length" len  ;FIXME: potentially -1
-                   "Upload-Metadata" um ;FIXME: potentially ""
+                   "Upload-Length" (str len) ;FIXME: potentially -1
+                   "Upload-Metadata" um      ;FIXME: potentially ""
                    }}))))
+
+(defmethod handle-request :post
+  [req opts]
+  (let [method-override (get-header req "x-http-method-override")]
+    (if (= method-override "PATCH")
+      (patch req opts)
+      (post req opts))))
 
 (defn make-handler
   "Returns a ring handler capable of responding to client requests from

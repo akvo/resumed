@@ -2,8 +2,12 @@
   (:require [clojure.test :refer :all]
             [org.akvo.resumed :refer :all]
             [ring.mock.request :as m]
-            [clojure.java.io :as io])
-  (:import java.io.File))
+            [clojure.java.io :as io]
+            [ring.adapter.jetty :as jetty])
+  (:import java.io.File
+           java.net.URL
+           [io.tus.java.client TusClient TusUpload
+            TusUploader TusURLMemoryStore]))
 
 (defn res-to-byte-array
   "Reads a resource file to a byte array
@@ -77,9 +81,9 @@
         resp (handler head)]
     (testing "HEAD"
       (is (= 200 (:status resp)))
-      (is (= len (get-in resp [:headers "Upload-Length"])))
+      (is (= (str len) (get-in resp [:headers "Upload-Length"])))
       (is (= um (get-in resp [:headers "Upload-Metadata"])))
-      (is (zero? (get-in resp [:headers "Upload-Offset"]))))))
+      (is (= "0" (get-in resp [:headers "Upload-Offset"]))))))
 
 (deftest patch-single-request
   (let [handler (make-handler)
@@ -99,7 +103,7 @@
         resp (handler patch)]
     (testing "PATCH in single request"
       (is (= 204 (:status resp)))
-      (is (= len (get-in resp [:headers "Upload-Offset"]))))))
+      (is (= (str len) (get-in resp [:headers "Upload-Offset"]))))))
 
 (deftest patch-multiple-requests
   (let [handler (make-handler)
@@ -126,5 +130,25 @@
                           (m/body (byte-array body)))
                 resp (handler patch)]
             (is (= 204 (:status resp)))
-            (is (= (+ offset rlen) (get-in resp [:headers "Upload-Offset"]))))
+            (is (= (str (+ offset rlen)) (get-in resp [:headers "Upload-Offset"]))))
           (recur (+ offset (count (first data))) (rest data)))))))
+
+(deftest java-client
+  (testing "Java client"
+    (let [handler (make-handler)
+          port (+ 3000 (int (rand 100)))
+          srv (jetty/run-jetty handler {:port port :join? false})
+          client (TusClient.)
+          _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
+          _ (.enableResuming client (TusURLMemoryStore.) )
+          f (io/file (io/resource "resources/pg11.txt"))
+          upload (TusUpload. f)
+          uploader (.resumeOrCreateUpload client upload)
+          chunk-size 1024
+          _ (.setChunkSize uploader chunk-size)]
+      (loop [up (.uploadChunk uploader)]
+        (when (> up -1)
+          (is (> (.getOffset uploader) 0))
+          (recur (.uploadChunk uploader))))
+      (.finish uploader)
+      (.stop srv))))
