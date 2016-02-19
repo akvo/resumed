@@ -12,7 +12,6 @@
                              :checksum :fail
                              :update :always}]]
   :profiles {:dev {:resource-paths ["test/resources"]
-                   :dependencies [[ring/ring-core "1.4.0"]
-                                  [ring/ring-jetty-adapter "1.4.0"]
+                   :dependencies [[ring/ring-jetty-adapter "1.4.0"]
                                   [ring/ring-mock "0.3.0"]
                                   [io.tus.java.client/tus-java-client "0.2.0"]]}})
