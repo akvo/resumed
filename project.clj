@@ -3,6 +3,9 @@
   :url "http://akvo.org"
   :license {:name "Mozilla Public License 2.0"
             :url "https://www.mozilla.org/en-US/MPL/2.0/"}
+  :signing {:gpg-key "devops@akvo.org"}
+  :deploy-repositories [["releases" :clojars]
+                        ["snapshots" :clojars]]
   :dependencies [[org.clojure/clojure "1.7.0"]]
   :repositories [["jcenter" {:url "http://jcenter.bintray.com"
                              :snapshots false
