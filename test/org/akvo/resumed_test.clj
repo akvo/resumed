@@ -151,4 +151,29 @@
           (is (> (.getOffset uploader) 0))
           (recur (.uploadChunk uploader))))
       (.finish uploader)
+      (.stop srv)))
+  (testing "Java client - resuming"
+    (let [handler (make-handler)
+          port (+ 3000 (int (rand 100)))
+          srv (jetty/run-jetty handler {:port port :join? false})
+          client (TusClient.)
+          _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
+          _ (.enableResuming client (TusURLMemoryStore.) )
+          f (io/file (io/resource "resources/pg11.txt"))
+          limit (/ (.length f) 2)
+          upload1 (TusUpload. f)
+          upldr (.resumeOrCreateUpload client upload1)
+          chunk-size 1024
+          _ (.setChunkSize upldr chunk-size)
+          _ (loop [up (.uploadChunk upldr)] ;; upload first half
+              (when (and (> up -1) (< (.getOffset upldr) limit))
+                (recur (.uploadChunk upldr))))
+          upload2 (TusUpload. f) ;; resume
+          upldr2 (.resumeOrCreateUpload client upload2)
+          _ (.setChunkSize upldr2 chunk-size)]
+      (loop [up (.uploadChunk upldr2)]
+        (when (> up -1)
+          (is (> (.getOffset upldr2) 0))
+          (recur (.uploadChunk upldr2))))
+      (.finish upldr2)
       (.stop srv))))
