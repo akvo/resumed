@@ -151,7 +151,9 @@
           (is (> (.getOffset uploader) 0))
           (recur (.uploadChunk uploader))))
       (.finish uploader)
-      (.stop srv)))
+      (.stop srv))))
+
+(deftest java-client-resume
   (testing "Java client - resuming"
     (let [handler (make-handler)
           port (+ 3000 (int (rand 100)))
@@ -175,5 +177,6 @@
         (when (> up -1)
           (is (> (.getOffset upldr2) 0))
           (recur (.uploadChunk upldr2))))
+      (.finish upldr)
       (.finish upldr2)
       (.stop srv))))
