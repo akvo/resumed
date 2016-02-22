@@ -82,7 +82,7 @@
             {:status 409
              :body "Conflict"}
             (with-open [tmp (ByteArrayOutputStream.)
-                        fos (FileOutputStream. (:file found) true)]
+                        fos (FileOutputStream. ^String (:file found) true)]
               (io/copy (:body req) tmp)
               (.write fos (.toByteArray tmp))
               (swap! current-uploads update-in [id :offset] + len)
