@@ -114,14 +114,17 @@
 (defn get-location
   "Get Location string from request"
   [req]
-  (format "%s://%s%s%s"
-          (name (:scheme req))
-          (:server-name req)
-          (if (and (not= (:server-port req) 80)
-                   (not= (:server-port req) 443))
-            (str ":" (:server-port req))
-            "")
-          (:uri req)))
+  (let [origin (get-in req [:headers "origin"])]
+    (if (not (str/blank? origin))
+      (format "%s%s" origin (:uri req))
+      (format "%s://%s%s%s"
+              (name (:scheme req))
+              (:server-name req)
+              (if (and (not= (:server-port req) 80)
+                       (not= (:server-port req) 443))
+                (str ":" (:server-port req))
+                "")
+              (:uri req)))))
 
 (defn post
   [req opts]
