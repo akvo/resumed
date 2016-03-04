@@ -20,16 +20,11 @@
 (defn gen-id []
   (.replaceAll (str (UUID/randomUUID)) "-" ""))
 
-(defn default-headers []
-  tus-headers)
-
 (defn options-headers []
   (select-keys tus-headers ["Tus-Version" "Tus-Extension" "Tus-Max-Size"]))
 
 (defn get-header [req header]
   (get-in req [:headers (.toLowerCase ^String header)]))
-
-
 
 (defn to-number
   "Returns a numeric representation of a String.
@@ -114,17 +109,22 @@
 (defn get-location
   "Get Location string from request"
   [req]
-  (let [origin (get-in req [:headers "origin"])]
-    (if (not (str/blank? origin))
-      (format "%s%s" origin (:uri req))
-      (format "%s://%s%s%s"
-              (name (:scheme req))
-              (:server-name req)
-              (if (and (not= (:server-port req) 80)
-                       (not= (:server-port req) 443))
-                (str ":" (:server-port req))
-                "")
-              (:uri req)))))
+  (let [origin (get-in req [:headers "origin"])
+        f-host (get-in req [:headers "x-forwarded-host"])
+        f-proto (get-in req [:headers "x-forwarded-proto"])
+        uri (:uri req)]
+    (if (and f-host f-proto)
+      (format "%s://%s%s" f-proto f-host uri)
+      (if (not (str/blank? origin))
+        (format "%s%s" origin uri)
+        (format "%s://%s%s%s"
+                (name (:scheme req))
+                (:server-name req)
+                (if (and (not= (:server-port req) 80)
+                         (not= (:server-port req) 443))
+                  (str ":" (:server-port req))
+                  "")
+                uri)))))
 
 (defn post
   [req opts]
