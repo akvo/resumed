@@ -3,6 +3,8 @@
 A [Ring](https://github.com/ring-clojure/ring/wiki/Concepts#handlers)
 handler to support [tus](http://tus.io/) resumable uploads
 
+[![Build Status](https://travis-ci.org/akvo/resumed.svg?branch=master)](https://travis-ci.org/akvo/resumed)
+
 ## Usage
 
 ````clojure

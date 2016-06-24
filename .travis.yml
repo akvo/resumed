@@ -1,0 +1,21 @@
+language:
+  - clojure
+
+sudo: false
+
+jdk:
+  - openjdk6
+  - openjdk7
+  - oraclejdk7
+  - oraclejdk8
+
+cache:
+  directories:
+  - $HOME/.m2
+
+before_install:
+  - mkdir -p $HOME/.lein
+  - echo '{:user {:plugins [[jonase/eastwood "0.2.3"]]}}' > $HOME/.lein/profiles.clj
+
+script:
+  - lein do clean, check, test :all, eastwood '{:source-paths ["src" "test"]}'
