@@ -1,3 +1,7 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at https://mozilla.org/MPL/2.0/
+
 (ns org.akvo.resumed-test
   (:require [clojure.test :refer :all]
             [org.akvo.resumed :refer :all]
@@ -46,9 +50,9 @@
         req (m/request :options "http://localhost:3000/files")
         resp (handler req)]
     (testing "OPTIONS"
-      (is (= (:status resp) 204))
+      (is (= 204 (:status resp)))
       (is (= 3 (count (keys (:headers resp)))))
-      (is (= (nil? (get-in resp [:headers "Tus-Resumable"])))))))
+      (is (= true (nil? (get-in resp [:headers "Tus-Resumable"])))))))
 
 (deftest good-post
   (let [handler (make-handler)
@@ -136,7 +140,7 @@
 (deftest java-client
   (testing "Java client"
     (let [handler (make-handler)
-          port (+ 3000 (int (rand 100)))
+          port (+ 3000 (int (rand 200)))
           srv (jetty/run-jetty handler {:port port :join? false})
           client (TusClient.)
           _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
@@ -150,7 +154,10 @@
         (when (> up -1)
           (is (> (.getOffset uploader) 0))
           (recur (.uploadChunk uploader))))
-      (.finish uploader)
+      (try
+        (.finish uploader)
+        (catch Exception e
+          (.printStackTrace e)))
       (.stop srv))))
 
 (deftest java-client-resume
@@ -170,6 +177,10 @@
           _ (loop [up (.uploadChunk upldr)] ;; upload first half
               (when (and (> up -1) (< (.getOffset upldr) limit))
                 (recur (.uploadChunk upldr))))
+          _ (try
+              (.finish upldr)
+              (catch Exception e
+                (.printStackTrace e)))
           upload2 (TusUpload. f) ;; resume
           upldr2 (.resumeOrCreateUpload client upload2)
           _ (.setChunkSize upldr2 chunk-size)]
@@ -177,6 +188,9 @@
         (when (> up -1)
           (is (> (.getOffset upldr2) 0))
           (recur (.uploadChunk upldr2))))
-      (.finish upldr)
-      (.finish upldr2)
+
+      (try
+        (.finish upldr2)
+        (catch Exception e
+          (.printStackTrace e)))
       (.stop srv))))

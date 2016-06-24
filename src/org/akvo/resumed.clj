@@ -4,7 +4,8 @@
 
 (ns org.akvo.resumed
   (:require [clojure.string :as str]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [clojure.core.cache :as cache])
   (:import [java.io File FileOutputStream ByteArrayOutputStream]
            java.util.UUID
            javax.xml.bind.DatatypeConverter))
@@ -12,10 +13,7 @@
 (def tus-headers
   {"Tus-Resumable" "1.0.0"
    "Tus-Version" "1.0.0"
-   "Tus-Extension" "creation"
-   "Tus-Max-Size" (str (* 1024 1024 50))})
-
-(defonce current-uploads (atom {}))
+   "Tus-Extension" "creation"})
 
 (defn gen-id []
   (.replaceAll (str (UUID/randomUUID)) "-" ""))
@@ -46,14 +44,14 @@
   {:status 400})
 
 (defmethod handle-request :options
-  [req opts]
+  [req {:keys [max-upload-size]}]
   {:status 204
-   :headers (options-headers)})
+   :headers (assoc (options-headers) "Tus-Max-Size" (str max-upload-size))})
 
 (defmethod handle-request :head
-  [req opts]
+  [req {:keys [save-path upload-cache]}]
   (let [upload-id (last (str/split (:uri req) #"/"))]
-    (if-let [found (@current-uploads upload-id)]
+    (if-let [found (cache/lookup @upload-cache upload-id)]
       {:status 200
        :headers (assoc tus-headers
                        "Upload-Offset" (str (:offset found))
@@ -63,15 +61,17 @@
        :body "Not Found"})))
 
 (defn patch
-  [req opts]
+  [req {:keys [save-path upload-cache]}]
   (let [id (last (str/split (:uri req) #"/"))
-        found (@current-uploads id)]
+        found (cache/lookup @upload-cache id)]
     (if found
       (let [len (-> req (get-header "content-length") to-number)
             off (-> req (get-header "upload-offset") to-number)
             ct (get-header req "content-type")]
-        (if (not= "application/offset+octet-stream" ct)
-          {:status 400 ;; FIXME: is this the right code?
+        (if (or (not= "application/offset+octet-stream" ct)
+                (= -1 len)
+                (= -1 off))
+          {:status 400
            :body "Bad request"}
           (if (not= (:offset found) off)
             {:status 409
@@ -80,10 +80,10 @@
                         fos (FileOutputStream. ^String (:file found) true)]
               (io/copy (:body req) tmp)
               (.write fos (.toByteArray tmp))
-              (swap! current-uploads update-in [id :offset] + len)
-              {:status 204
-               :headers (assoc tus-headers
-                               "Upload-Offset" (str (:offset (@current-uploads id))))}))))
+              (let [new-uploads (swap! upload-cache update-in [id :offset] + len)]
+                {:status 204
+                 :headers (assoc tus-headers
+                                 "Upload-Offset" (str (get-in new-uploads [id :offset])))})))))
       {:status 404
        :body "Not Found"})))
 
@@ -101,19 +101,19 @@
     (let [m (->> (str/split s #",")
                  (map #(str/split % #" "))
                  (into {}))]
-      (when (contains? m "filename")
-        (-> (m "filename")
+      (when-let [filename (get m "filename")]
+        (-> filename
             (DatatypeConverter/parseBase64Binary)
             (String.))))))
 
 (defn get-location
   "Get Location string from request"
   [req]
-  (let [origin (get-in req [:headers "origin"])
-        f-host (get-in req [:headers "x-forwarded-host"])
-        f-proto (get-in req [:headers "x-forwarded-proto"])
+  (let [origin (get-header req "origin")
+        f-host (get-header req "x-forwarded-host")
+        f-proto (get-header req "x-forwarded-proto")
         uri (:uri req)]
-    (if (and f-host f-proto)
+    (if (and (not (str/blank? f-host)) (not (str/blank? f-proto)))
       (format "%s://%s%s" f-proto f-host uri)
       (if (not (str/blank? origin))
         (format "%s%s" origin uri)
@@ -127,24 +127,30 @@
                 uri)))))
 
 (defn post
-  [req opts]
+  [req {:keys [save-path upload-cache max-upload-size]}]
   (let [len (-> req (get-header "upload-length") to-number)]
-    (if (> len (to-number (tus-headers "Tus-Max-Size")))
-      {:status 413
-       :body "Request Entity Loo Large"}
-      (let [id (gen-id)
-            um (get-header req "upload-metadata")
-            fname (or (get-filename um)  "file")
-            fpath (str (:save-path opts) "/" id)
-            f (str fpath "/" fname)]
-        (swap! current-uploads assoc id {:offset 0 :file f :length len :metadata um})
-        (.mkdirs (File. fpath))
-        (.createNewFile (File. f))
-        {:status 201
-         :headers {"Location" (str (get-location req) "/" id)
-                   "Upload-Length" (str len) ;FIXME: potentially -1
-                   "Upload-Metadata" um      ;FIXME: potentially ""
-                   }}))))
+    (cond
+      (neg? len) {:status 400
+                  :body "Bad Request"}
+
+      (> len max-upload-size) {:status 413
+                               :body "Request Entity Loo Large"}
+
+      :else (let [id (gen-id)
+                  um (get-header req "upload-metadata")
+                  fname (or (get-filename um)  "file")
+                  path (File. save-path id)
+                  f (File. path fname)]
+              (.mkdirs path)
+              (.createNewFile f)
+              (swap! upload-cache assoc id {:offset 0
+                                            :file (.getAbsolutePath f)
+                                            :length len
+                                            :metadata um})
+              {:status 201
+               :headers {"Location" (str (get-location req) "/" id)
+                         "Upload-Length" (str len)
+                         "Upload-Metadata" um}}))))
 
 (defmethod handle-request :post
   [req opts]
@@ -156,11 +162,16 @@
 (defn make-handler
   "Returns a ring handler capable of responding to client requests from
   a `tus` client. An optional map with configuration can be used
-  {:save-dir \"/path/to/save/dir\"} defaults to `java.io.tmpdir`"
+  {:resumed-save-dir \"/path/to/save/dir\"} defaults to `java.io.tmpdir`"
   [& [opts]]
-  (let [save-dir (or (:save-dir opts)
-                     (System/getProperty "java.io.tmpdir"))
-        save-path (File. (str save-dir "/resumed"))]
-    (.mkdirs save-path)
+  (let [save-path (or (:save-path opts)
+                      (str (System/getProperty "java.io.tmpdir") "/resumed"))
+        upload-cache (atom (or (:upload-cache opts)
+                               (cache/fifo-cache-factory {} :threshold 250)))
+        max-upload-size (* 1024
+                           1024
+                           (or (:max-upload-size opts) 50))]
     (fn [req]
-      (handle-request req (assoc opts :save-path (str save-path))))))
+      (handle-request req {:save-path save-path
+                           :upload-cache upload-cache
+                           :max-upload-size max-upload-size}))))
