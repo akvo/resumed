@@ -68,9 +68,7 @@
       (let [len (-> req (get-header "content-length") to-number)
             off (-> req (get-header "upload-offset") to-number)
             ct (get-header req "content-type")]
-        (if (or (not= "application/offset+octet-stream" ct)
-                (= -1 len)
-                (= -1 off))
+        (if (not= "application/offset+octet-stream" ct)
           {:status 400
            :body "Bad request"}
           (if (not= (:offset found) off)
@@ -139,8 +137,8 @@
       :else (let [id (gen-id)
                   um (get-header req "upload-metadata")
                   fname (or (get-filename um)  "file")
-                  path (File. save-path id)
-                  f (File. path fname)]
+                  path (File. ^String save-path ^String id)
+                  f (File. ^File path ^String fname)]
               (.mkdirs path)
               (.createNewFile f)
               (swap! upload-cache assoc id {:offset 0

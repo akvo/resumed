@@ -177,10 +177,6 @@
           _ (loop [up (.uploadChunk upldr)] ;; upload first half
               (when (and (> up -1) (< (.getOffset upldr) limit))
                 (recur (.uploadChunk upldr))))
-          _ (try
-              (.finish upldr)
-              (catch Exception e
-                (.printStackTrace e)))
           upload2 (TusUpload. f) ;; resume
           upldr2 (.resumeOrCreateUpload client upload2)
           _ (.setChunkSize upldr2 chunk-size)]
@@ -188,8 +184,8 @@
         (when (> up -1)
           (is (> (.getOffset upldr2) 0))
           (recur (.uploadChunk upldr2))))
-
       (try
+        (.finish upldr)
         (.finish upldr2)
         (catch Exception e
           (.printStackTrace e)))
