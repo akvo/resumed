@@ -77,8 +77,10 @@
             (with-open [tmp (ByteArrayOutputStream.)
                         fos (FileOutputStream. ^String (:file found) true)]
               (io/copy (:body req) tmp)
+              ;; TODO: check if (= (.size tmp) len) and possible return 400 ?
               (.write fos (.toByteArray tmp))
-              (let [new-uploads (swap! upload-cache update-in [id :offset] + len)]
+              (let [len (.size tmp)
+                    new-uploads (swap! upload-cache update-in [id :offset] + len)]
                 {:status 204
                  :headers (assoc tus-headers
                                  "Upload-Offset" (str (get-in new-uploads [id :offset])))})))))
