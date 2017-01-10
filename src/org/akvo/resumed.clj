@@ -3,9 +3,9 @@
 ;; file, You can obtain one at https://mozilla.org/MPL/2.0/
 
 (ns org.akvo.resumed
-  (:require [clojure.string :as str]
+  (:require [clojure.core.cache :as cache]
             [clojure.java.io :as io]
-            [clojure.core.cache :as cache])
+            [clojure.string :as str])
   (:import [java.io File FileOutputStream ByteArrayOutputStream]
            java.util.UUID
            javax.xml.bind.DatatypeConverter))
@@ -110,7 +110,8 @@
   "Get Location string from request"
   [req]
   (let [origin (get-header req "origin")
-        f-host (get-header req "x-forwarded-host")
+        f-host (or (get-header req "x-forwarded-host")
+                   (get-header req "host"))
         f-proto (get-header req "x-forwarded-proto")
         uri (:uri req)]
     (if (and (not (str/blank? f-host)) (not (str/blank? f-proto)))

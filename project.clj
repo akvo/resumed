@@ -1,4 +1,4 @@
-(defproject org.akvo/resumed "0.1.0-SNAPSHOT"
+(defproject org.akvo/resumed "0.2.0"
   :description "A Ring handler to support tus.io protocol"
   :url "http://akvo.org"
   :license {:name "Mozilla Public License 2.0"
