@@ -193,3 +193,19 @@
         (catch Exception e
           (.printStackTrace e)))
       (.stop srv))))
+
+(deftest google-cloud-load-balancer-complience
+  (testing "Lack of x-forwarded-host should fallback on host"
+    (let [req {:headers {"accept" "*/*"
+                         "accept-encoding" "gzip, deflate"
+                         "connection" "Keep-Alive"
+                         "host" "www.akvo.org"
+                         "user-agent" "."
+                         "via" "1.1 google"
+                         "x-cloud-trace-context" ""
+                         "x-forwarded-for" "0.0.0.0, 127.0.0.1"
+                         "x-forwarded-proto" "https"
+                         }
+               :uri "/path"}]
+      (is (= "https://www.akvo.org/path"
+             (get-location req))))))
