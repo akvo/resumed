@@ -140,59 +140,55 @@
 (deftest java-client
   (testing "Java client"
     (let [handler (make-handler)
-          srv (jetty/run-jetty handler {:port 0 :join? false})
-          port (port srv)
-          client (TusClient.)
-          _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
-          _ (.enableResuming client (TusURLMemoryStore.) )
-          f (io/file (io/resource "resources/pg11.txt"))
-          upload (TusUpload. f)
-          uploader (.resumeOrCreateUpload client upload)
-          chunk-size 1024
-          _ (.setChunkSize uploader chunk-size)]
-      (loop [up (.uploadChunk uploader)]
-        (when (> up -1)
-          (is (> (.getOffset uploader) 0))
-          (recur (.uploadChunk uploader))))
+          srv (jetty/run-jetty handler {:port 0 :join? false})]
       (try
-        (.finish uploader)
-        (catch Exception e
-          (.printStackTrace e)))
-      (.stop srv))))
+        (let [port (port srv)
+              client (TusClient.)
+              _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
+              _ (.enableResuming client (TusURLMemoryStore.))
+              f (io/file (io/resource "resources/pg11.txt"))
+              upload (TusUpload. f)
+              uploader (.resumeOrCreateUpload client upload)
+              chunk-size 1024
+              _ (.setChunkSize uploader chunk-size)]
+          (loop [up (.uploadChunk uploader)]
+            (when (> up -1)
+              (is (> (.getOffset uploader) 0))
+              (recur (.uploadChunk uploader))))
+          (.finish uploader))
+        (finally
+          (.stop srv))))))
 
 (deftest java-client-resume
   (testing "Java client - resuming"
     (let [handler (make-handler)
-          srv (jetty/run-jetty handler {:port 0 :join? false})
-          port (port srv)
-          client (TusClient.)
-          _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
-          _ (.enableResuming client (TusURLMemoryStore.) )
-          f (io/file (io/resource "resources/pg11.txt"))
-          limit (/ (.length f) 2)
-          upload1 (TusUpload. f)
-          upldr (.resumeOrCreateUpload client upload1)
-          chunk-size 1024
-          _ (.setChunkSize upldr chunk-size)
-          _ (loop [up (.uploadChunk upldr)] ;; upload first half
-              (when (and (> up -1) (< (.getOffset upldr) limit))
-                (recur (.uploadChunk upldr))))
-          _ (try
-              (.finish upldr)
-              (catch Exception e
-                (.printStackTrace e)))
-          upload2 (TusUpload. f) ;; resume
-          upldr2 (.resumeOrCreateUpload client upload2)
-          _ (.setChunkSize upldr2 chunk-size)]
-      (loop [up (.uploadChunk upldr2)]
-        (when (> up -1)
-          (is (> (.getOffset upldr2) 0))
-          (recur (.uploadChunk upldr2))))
+          srv (jetty/run-jetty handler {:port 0 :join? false})]
       (try
-        (.finish upldr2)
-        (catch Exception e
-          (.printStackTrace e)))
-      (.stop srv))))
+        (let [port (port srv)
+              client (TusClient.)
+              _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
+              _ (.enableResuming client (TusURLMemoryStore.))
+              f (io/file (io/resource "resources/pg11.txt"))
+              limit (/ (.length f) 2)
+              upload1 (TusUpload. f)
+              upldr (.resumeOrCreateUpload client upload1)
+              chunk-size 1024
+              _ (.setChunkSize upldr chunk-size)
+              _ (loop [up (.uploadChunk upldr)]             ;; upload first half
+                  (when (and (> up -1) (< (.getOffset upldr) limit))
+                    (recur (.uploadChunk upldr))))
+              _ (.finish upldr)
+              upload2 (TusUpload. f)                        ;; resume
+              upldr2 (.resumeOrCreateUpload client upload2)
+              _ (.setChunkSize upldr2 chunk-size)]
+          (loop [up (.uploadChunk upldr2)]
+            (when (> up -1)
+              (is (> (.getOffset upldr2) 0))
+              (recur (.uploadChunk upldr2))))
+          (.finish upldr2)
+          (.stop srv))
+        (finally
+          (.stop srv))))))
 
 (deftest google-cloud-load-balancer-complience
   (testing "Lack of x-forwarded-host should fallback on host header"
