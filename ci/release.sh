@@ -2,10 +2,6 @@
 
 set -eu
 
-if [[ "${TRAVIS_BRANCH}" != "master" ]]; then
-    exit 0
-fi
-
 RELEASE_VERSION="1.${TRAVIS_BUILD_NUMBER}.${TRAVIS_COMMIT}"
 
 lein with-profile +set-version set-version $RELEASE_VERSION
