@@ -10,7 +10,7 @@
                                      :password      :env/clojars_password}]]
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.cache "0.6.5"]]
-  :repositories [["jcenter" {:url "http://jcenter.bintray.com"
+  :repositories [["jcenter" {:url "https://jcenter.bintray.com"
                              :snapshots false
                              :checksum :fail
                              :update :always}]]
