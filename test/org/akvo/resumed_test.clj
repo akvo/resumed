@@ -1,7 +1,3 @@
-;; This Source Code Form is subject to the terms of the Mozilla Public
-;; License, v. 2.0. If a copy of the MPL was not distributed with this
-;; file, You can obtain one at https://mozilla.org/MPL/2.0/
-
 (ns org.akvo.resumed-test
   (:require [clojure.test :refer :all]
             [org.akvo.resumed :refer :all]
@@ -62,14 +58,12 @@
                 (m/header "Upload-Length" 10))
         resp (handler req)
         location (get-in resp [:headers "Location"])
-        metadata (get-in resp [:headers "Upload-Metadata"])
-        tmpdir (str (System/getProperty "java.io.tmpdir") "/resumed")
-        upload-id (last (.split location "/" -1))]
+        metadata (get-in resp [:headers "Upload-Metadata"])]
     (testing "POST"
       (is (= 201 (:status resp)))
       (is (= true (.startsWith location "http://localhost:3000/files/")))
-      (is (= true (.exists (File. (str tmpdir "/" upload-id)))))
-      (is (= 0 (.length (File. (str tmpdir "/" upload-id "/world_domination_plan.pdf")))))
+      (is (= true (.exists (file-for-upload nil location))))
+      (is (= 0 (.length (file-for-upload nil location))))
       (is (= um metadata)))))
 
 (deftest test-good-head
@@ -137,11 +131,17 @@
             (is (= (str (+ offset rlen)) (get-in resp [:headers "Upload-Offset"]))))
           (recur (+ offset (count (first data))) (rest data)))))))
 
+(defn port [jetty]
+  (-> jetty
+      .getConnectors
+      first
+      .getLocalPort))
+
 (deftest java-client
   (testing "Java client"
     (let [handler (make-handler)
-          port (+ 3000 (int (rand 200)))
-          srv (jetty/run-jetty handler {:port port :join? false})
+          srv (jetty/run-jetty handler {:port 0 :join? false})
+          port (port srv)
           client (TusClient.)
           _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
           _ (.enableResuming client (TusURLMemoryStore.) )
@@ -163,8 +163,8 @@
 (deftest java-client-resume
   (testing "Java client - resuming"
     (let [handler (make-handler)
-          port (+ 3000 (int (rand 100)))
-          srv (jetty/run-jetty handler {:port port :join? false})
+          srv (jetty/run-jetty handler {:port 0 :join? false})
+          port (port srv)
           client (TusClient.)
           _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
           _ (.enableResuming client (TusURLMemoryStore.) )

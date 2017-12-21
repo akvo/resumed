@@ -48,9 +48,12 @@
   {:status 204
    :headers (assoc (options-headers) "Tus-Max-Size" (str max-upload-size))})
 
+(defn id-from-url [url]
+  (last (str/split url #"/")))
+
 (defmethod handle-request :head
   [req {:keys [save-path upload-cache]}]
-  (let [upload-id (last (str/split (:uri req) #"/"))]
+  (let [upload-id (id-from-url (:uri req))]
     (if-let [found (cache/lookup @upload-cache upload-id)]
       {:status 200
        :headers (assoc tus-headers
@@ -62,7 +65,7 @@
 
 (defn patch
   [req {:keys [save-path upload-cache]}]
-  (let [id (last (str/split (:uri req) #"/"))
+  (let [id (id-from-url (:uri req))
         found (cache/lookup @upload-cache id)]
     (if found
       (let [len (-> req (get-header "content-length") to-number)
@@ -160,13 +163,15 @@
       (patch req opts)
       (post req opts))))
 
+(defn save-path [save-dir]
+  (str (or save-dir (System/getProperty "java.io.tmpdir")) "/resumed"))
+
 (defn make-handler
   "Returns a ring handler capable of responding to client requests from
   a `tus` client. An optional map with configuration can be used
-  {:resumed-save-dir \"/path/to/save/dir\"} defaults to `java.io.tmpdir`"
+  {:save-dir \"/path/to/save/dir\"} defaults to `java.io.tmpdir`"
   [& [opts]]
-  (let [save-path (or (:save-path opts)
-                      (str (System/getProperty "java.io.tmpdir") "/resumed"))
+  (let [save-path (save-path (:save-dir opts))
         upload-cache (atom (or (:upload-cache opts)
                                (cache/fifo-cache-factory {} :threshold 250)))
         max-upload-size (* 1024
@@ -176,3 +181,15 @@
       (handle-request req {:save-path save-path
                            :upload-cache upload-cache
                            :max-upload-size max-upload-size}))))
+
+(defn file-for-upload
+  "Given a save-dir and a file upload url, it returns the java.io.File that was uploaded"
+  [save-dir uri]
+  (let [id (id-from-url uri)
+        upload-path (str (save-path save-dir) "/" id)]
+    (when-not (re-matches #"[a-zA-Z0-9-]+" id)
+      (throw (ex-info "Invalid file" {:filename id})))
+    (-> upload-path
+        io/file
+        .listFiles
+        first)))
