@@ -17,4 +17,4 @@ before_install:
   - echo '{:user {:plugins [[jonase/eastwood "0.2.3"]]}}' > $HOME/.lein/profiles.clj
 
 script:
-  - lein do clean, check, test :all, eastwood '{:source-paths ["src" "test"]}'
+  - ci/build.sh

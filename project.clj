@@ -4,8 +4,10 @@
   :license {:name "Mozilla Public License 2.0"
             :url "https://www.mozilla.org/en-US/MPL/2.0/"}
   :signing {:gpg-key "devops@akvo.org"}
-  :deploy-repositories [["releases" :clojars]
-                        ["snapshots" :clojars]]
+  :deploy-repositories [["releases" {:url           "https://clojars.org/repo"
+                                     :sign-releases false
+                                     :username      "akvo"
+                                     :password      :env/clojars_password}]]
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/core.cache "0.6.5"]]
   :repositories [["jcenter" {:url "http://jcenter.bintray.com"
@@ -15,4 +17,5 @@
   :profiles {:dev {:resource-paths ["test/resources"]
                    :dependencies [[ring/ring-jetty-adapter "1.4.0"]
                                   [ring/ring-mock "0.3.0"]
-                                  [io.tus.java.client/tus-java-client "0.3.1"]]}})
+                                  [io.tus.java.client/tus-java-client "0.3.1"]]}
+             :set-version {:plugins [[lein-set-version "0.4.1"]]}})
