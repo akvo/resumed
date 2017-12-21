@@ -7,25 +7,25 @@
   (:import java.io.File
            java.net.URL
            [io.tus.java.client TusClient TusUpload
-            TusUploader TusURLMemoryStore]))
+                               TusUploader TusURLMemoryStore]))
 
 (defn res-to-byte-array
   "Reads a resource file to a byte array
   Attribution: http://stackoverflow.com/a/26791567"
   ([path off len]
    (let [f (io/file (io/resource path))
-        ba (byte-array len)
-        is (io/input-stream f)]
-    (.read is ba off len)
-    (.close is)
-    ba))
+         ba (byte-array len)
+         is (io/input-stream f)]
+     (.read is ba off len)
+     (.close is)
+     ba))
   ([path]
    (let [f (io/file (io/resource path))
-        ba (byte-array (.length f))
-        is (io/input-stream f)]
-    (.read is ba)
-    (.close is)
-    ba)))
+         ba (byte-array (.length f))
+         is (io/input-stream f)]
+     (.read is ba)
+     (.close is)
+     ba)))
 
 (deftest test-utilities
   (testing "Testing utility functions"
@@ -34,7 +34,7 @@
     (is (= true (nil? (get-filename nil))))
     (is (= "world_domination_plan.pdf" (get-filename "filename d29ybGRfZG9taW5hdGlvbl9wbGFuLnBkZg==")))
     (is (= "max-age=0" (get-header {:params {} :headers {"tus-resumable" "1.0.0"
-                                                         "connection" "keep-alive"
+                                                         "connection"    "keep-alive"
                                                          "cache-control" "max-age=0"}} "Cache-Control")))
     (is (= "https://mysecure-host.org/files" (get-location (m/request :get "https://mysecure-host.org/files"))))
     (is (= "http://localhost:3000/files" (get-location (m/request :get "http://localhost:3000/files"))))
@@ -131,6 +131,16 @@
             (is (= (str (+ offset rlen)) (get-in resp [:headers "Upload-Offset"]))))
           (recur (+ offset (count (first data))) (rest data)))))))
 
+(deftest file-too-big
+  (let [handler (make-handler {:max-upload-size 0.1})
+        req (-> (m/request :post "http://localhost:3000/files")
+                (m/header "Upload-Length" 1000000))
+        resp (handler req)
+        location (get-in resp [:headers "Location"])]
+    (testing "POST"
+      (is (= 413 (:status resp)))
+      (is (nil? location)))))
+
 (defn port [jetty]
   (-> jetty
       .getConnectors
@@ -192,15 +202,15 @@
 
 (deftest google-cloud-load-balancer-complience
   (testing "Lack of x-forwarded-host should fallback on host header"
-    (let [req {:headers {"accept" "*/*"
-                         "accept-encoding" "gzip, deflate"
-                         "connection" "Keep-Alive"
-                         "host" "www.akvo.org"
-                         "user-agent" "."
-                         "via" "1.1 google"
+    (let [req {:headers {"accept"                "*/*"
+                         "accept-encoding"       "gzip, deflate"
+                         "connection"            "Keep-Alive"
+                         "host"                  "www.akvo.org"
+                         "user-agent"            "."
+                         "via"                   "1.1 google"
                          "x-cloud-trace-context" ""
-                         "x-forwarded-for" "0.0.0.0, 127.0.0.1"
-                         "x-forwarded-proto" "https"}
-               :uri "/path"}]
+                         "x-forwarded-for"       "0.0.0.0, 127.0.0.1"
+                         "x-forwarded-proto"     "https"}
+               :uri     "/path"}]
       (is (= "https://www.akvo.org/path"
              (get-location req))))))
