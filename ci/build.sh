@@ -13,9 +13,3 @@ if [[ "${TRAVIS_PULL_REQUEST}" != "false" ]]; then
 fi
 
 lein do clean, check, test :all, eastwood '{:source-paths ["src" "test"]}'
-
-if [[ "${TRAVIS_BRANCH}" != "master" ]]; then
-    exit 0
-fi
-
-ci/release.sh
