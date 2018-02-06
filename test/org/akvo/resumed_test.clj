@@ -81,7 +81,8 @@
       (is (= 200 (:status resp)))
       (is (= (str len) (get-in resp [:headers "Upload-Length"])))
       (is (= um (get-in resp [:headers "Upload-Metadata"])))
-      (is (= "0" (get-in resp [:headers "Upload-Offset"]))))))
+      (is (= "0" (get-in resp [:headers "Upload-Offset"])))
+      (is (= "no-cache" (get-in resp [:headers "Cache-Control"]))))))
 
 (deftest patch-single-request
   (let [handler (make-handler)
