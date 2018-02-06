@@ -86,7 +86,7 @@
 
 (deftest test-head-not-found
   (let [handler (make-handler)
-        head (-> (m/request :head "http://localhost:3000/file/some-file"))
+        head (m/request :head "http://localhost:3000/file/some-file")
         resp (handler head)]
     (testing "HEAD not found"
       (is (= 404 (:status resp)))
