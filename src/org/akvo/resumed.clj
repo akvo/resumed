@@ -59,7 +59,8 @@
        :headers (assoc tus-headers
                        "Upload-Offset" (str (:offset found))
                        "Upload-Length" (str (:length found))
-                       "Upload-Metadata" (:metadata found))}
+                       "Upload-Metadata" (:metadata found)
+                       "Cache-Control" "no-cache")}
       {:status 404
        :body "Not Found"})))
 
