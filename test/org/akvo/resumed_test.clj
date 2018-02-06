@@ -84,6 +84,14 @@
       (is (= "0" (get-in resp [:headers "Upload-Offset"])))
       (is (= "no-cache" (get-in resp [:headers "Cache-Control"]))))))
 
+(deftest test-head-not-found
+  (let [handler (make-handler)
+        head (-> (m/request :head "http://localhost:3000/file/some-file"))
+        resp (handler head)]
+    (testing "HEAD not found"
+      (is (= 404 (:status resp)))
+      (is (= "no-cache" (get-in resp [:headers "Cache-Control"]))))))
+
 (deftest patch-single-request
   (let [handler (make-handler)
         um "filename cGcxMS50eHQ="

@@ -62,7 +62,8 @@
                        "Upload-Metadata" (:metadata found)
                        "Cache-Control" "no-cache")}
       {:status 404
-       :body "Not Found"})))
+       :body "Not Found"
+       :headers {"Cache-Control" "no-cache"}})))
 
 (defn patch
   [req {:keys [save-path upload-cache]}]
