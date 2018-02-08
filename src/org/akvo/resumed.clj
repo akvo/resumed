@@ -70,25 +70,34 @@
   (let [id (id-from-url (:uri req))
         found (cache/lookup @upload-cache id)]
     (if found
-      (let [len (-> req (get-header "content-length") to-number)
+      (let [rlen (-> req (get-header "content-length") to-number)
             off (-> req (get-header "upload-offset") to-number)
-            ct (get-header req "content-type")]
-        (if (not= "application/offset+octet-stream" ct)
-          {:status 400
-           :body "Bad request"}
-          (if (not= (:offset found) off)
-            {:status 409
-             :body "Conflict"}
-            (with-open [tmp (ByteArrayOutputStream.)
-                        fos (FileOutputStream. ^String (:file found) true)]
-              (io/copy (:body req) tmp)
-              ;; TODO: check if (= (.size tmp) len) and possible return 400 ?
-              (.write fos (.toByteArray tmp))
-              (let [len (.size tmp)
-                    new-uploads (swap! upload-cache update-in [id :offset] + len)]
-                {:status 204
-                 :headers (assoc tus-headers
-                                 "Upload-Offset" (str (get-in new-uploads [id :offset])))})))))
+            ct (get-header req "content-type")
+            tmp (ByteArrayOutputStream.)
+            _ (io/copy (:body req) tmp)
+            len (.size tmp)]
+        (cond
+          (not= "application/offset+octet-stream" ct) {:status 400
+                                                       :body "Bad request: Content-Type must be application/offset+octet-stream"}
+          (not= (:offset found) off) {:status 409
+                                      :body "Conflict: Wrong Upload-Offset"}
+
+          (and (not= -1 rlen)
+               (not= rlen len)) {:status 400
+                                 :body "Bad request: Request body size doesn't match with Content-Length header"}
+
+          (or (> len (:length found))
+              (> (+ len (:offset found)) (:length found))) {:status 413
+                                                            :body (format "Body size exceeds the %s bytes allowed"
+                                                                          (:length found))}
+
+          :else (with-open [fos (FileOutputStream. ^String (:file found) true)]
+                  (.write fos (.toByteArray tmp))
+                  (let [len (.size tmp)
+                        new-uploads (swap! upload-cache update-in [id :offset] + len)]
+                    {:status 204
+                     :headers (assoc tus-headers
+                                     "Upload-Offset" (str (get-in new-uploads [id :offset])))}))))
       {:status 404
        :body "Not Found"})))
 

@@ -223,3 +223,27 @@
                :uri     "/path"}]
       (is (= "https://www.akvo.org/path"
              (get-location req))))))
+
+(deftest check-upload-length
+  (testing "Restrict the number of PATCH requests to the Upload-Length"
+    (let [ba (res-to-byte-array "resources/pg11.txt")
+          len (count ba)
+          handler (make-handler {:max-upload-size 0.5})
+          um "filename cGcxMS50eHQ="
+          post-req (-> (m/request :post "http://localhost:3000/files")
+                       (m/header "Upload-Metadata" um)
+                       (m/header "Upload-Length" len))
+          post-res (handler post-req)
+          location (get-in post-res [:headers "Location"])]
+      (dotimes [n 10]
+        (let [patch-req (-> (m/request :patch location)
+                            (m/header "Content-Type" "application/offset+octet-stream")
+                            (m/header "Content-Length" len)
+                            (m/header "Upload-Offset" (* n len))
+                            (m/body ba))
+              patch-res (handler patch-req)]
+          (when (zero? n)
+            (is (= 204 (:status patch-res)))
+            (is (= (str (* (inc n) len)) (get-in patch-res [:headers "Upload-Offset"]))))
+          (when-not (zero? n)
+            (is (not= 204 (:status patch-res)))))))))
