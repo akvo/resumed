@@ -4,7 +4,7 @@ language:
 sudo: false
 
 jdk:
-  - openjdk7
+  - openjdk8
 
 cache:
   directories:
@@ -12,7 +12,7 @@ cache:
 
 before_install:
   - mkdir -p $HOME/.lein
-  - echo '{:user {:plugins [[jonase/eastwood "0.2.3"]]}}' > $HOME/.lein/profiles.clj
+  - echo '{:user {:plugins [[jonase/eastwood "0.2.5"]]}}' > $HOME/.lein/profiles.clj
 
 script:
   - ci/build.sh
