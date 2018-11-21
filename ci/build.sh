@@ -1,14 +1,10 @@
 #!/usr/bin/env bash
 
-set -e
+set -eu
 
 BRANCH_NAME="${TRAVIS_BRANCH:=unknown}"
 
-if [ -z "$TRAVIS_COMMIT" ]; then
-    export TRAVIS_COMMIT=local
-fi
-
-if [[ "${TRAVIS_PULL_REQUEST}" != "false" ]]; then
+if [[ "${TRAVIS_PULL_REQUEST:=false}" != "false" ]]; then
     exit 0
 fi
 
