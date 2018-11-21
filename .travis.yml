@@ -10,5 +10,9 @@ cache:
   directories:
   - $HOME/.m2
 
+before_install:
+  - mkdir -p $HOME/.lein
+  - echo '{:user {:plugins [[jonase/eastwood "0.2.3"]]}}' > $HOME/.lein/profiles.clj
+
 script:
   - ci/build.sh
