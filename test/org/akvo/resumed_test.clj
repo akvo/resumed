@@ -211,15 +211,27 @@
 
 (deftest google-cloud-load-balancer-complience
   (testing "Lack of x-forwarded-host should fallback on host header"
-    (let [req {:headers {"accept"                "*/*"
-                         "accept-encoding"       "gzip, deflate"
-                         "connection"            "Keep-Alive"
-                         "host"                  "www.akvo.org"
-                         "user-agent"            "."
-                         "via"                   "1.1 google"
-                         "x-cloud-trace-context" ""
-                         "x-forwarded-for"       "0.0.0.0, 127.0.0.1"
+    (let [req {:headers {"host"                  "www.akvo.org"
                          "x-forwarded-proto"     "https"}
-               :uri     "/path"}]
-      (is (= "https://www.akvo.org/path"
-             (get-location req))))))
+               :uri     "/path"
+               :server-port 3000
+               :scheme :http}
+          req-2 (update req :headers dissoc "x-forwarded-proto")
+          req-3 {:headers {"host" "localhost:3030"}
+                 :uri "/path"
+                 :server-port 4000
+                 :scheme :http}
+          req-4 {:headers {"host" "some.tld"}
+                 :uri "/path"
+                 :server-port 4000
+                 :scheme :http}
+          req-5 {:headers {"host" "some.tld"}
+                 :uri "/path"
+                 :server-port 8443
+                 :scheme :https}]
+      (are [x y] (= x y)
+        "https://www.akvo.org/path" (get-location req)
+        "http://www.akvo.org:3000/path" (get-location req-2)
+        "http://localhost:3030/path" (get-location req-3)
+        "http://some.tld:4000/path" (get-location req-4)
+        "https://some.tld:8443/path" (get-location req-5)))))

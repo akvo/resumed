@@ -21,7 +21,7 @@
 (defn options-headers []
   (select-keys tus-headers ["Tus-Version" "Tus-Extension" "Tus-Max-Size"]))
 
-(defn get-header [req header]
+(defn get-header ^String [req header]
   (get-in req [:headers (.toLowerCase ^String header)]))
 
 (defn to-number
@@ -111,26 +111,52 @@
             (DatatypeConverter/parseBase64Binary)
             (String.))))))
 
+(defn get-host
+  "Returns the HOST for a given request
+  It attempts to honor: X-Forwared-Host, Origin, Host headers"
+  [req]
+  (let [host (or (get-header req "x-forwarded-host")
+                 (get-header req "origin")
+                 (first (.split (or (get-header req "host") "") ":")))]
+    (if (str/blank? host)
+      (:server-name req)
+      host)))
+
+(defn get-protocol
+  "Returns the protocol #{\"http\" \"https\"} for a given request"
+  [req]
+  (let [forwarded-proto (get-header req "x-forwarded-proto")
+        known-protocols #{"http" "https"}]
+    (if (or (str/blank? forwarded-proto)
+            (not (known-protocols forwarded-proto)))
+      (name (:scheme req))
+      forwarded-proto)))
+
+(def ^:const http-default-ports #{443 80})
+
+(defn get-port
+  "Returns the port of the request,
+  Empty if port is 80, 443 as those are default ports
+  Empty for forwared requests (server behind a proxy)"
+  [req]
+  (let [forwarded (or (get-header req "x-forwarded-host")
+                      (get-header req "x-forwarded-proto"))
+        host (get-header req "host")]
+    (if (or forwarded
+            (http-default-ports (:server-port req)))
+      ""
+      (if (and host (.contains host ":"))
+          (re-find #":\d+" host)
+          (str ":" (:server-port req))))))
+
 (defn get-location
   "Get Location string from request"
   [req]
-  (let [origin (get-header req "origin")
-        f-host (or (get-header req "x-forwarded-host")
-                   (get-header req "host"))
-        f-proto (get-header req "x-forwarded-proto")
+  (let [host (get-host req)
+        proto (get-protocol req)
+        port (get-port req)
         uri (:uri req)]
-    (if (and (not (str/blank? f-host)) (not (str/blank? f-proto)))
-      (format "%s://%s%s" f-proto f-host uri)
-      (if (not (str/blank? origin))
-        (format "%s%s" origin uri)
-        (format "%s://%s%s%s"
-                (name (:scheme req))
-                (:server-name req)
-                (if (and (not= (:server-port req) 80)
-                         (not= (:server-port req) 443))
-                  (str ":" (:server-port req))
-                  "")
-                uri)))))
+    (format "%s://%s%s%s" proto host port uri)))
 
 (defn post
   [req {:keys [save-path upload-cache max-upload-size]}]

@@ -8,13 +8,14 @@
                                      :sign-releases false
                                      :username      "akvo"
                                      :password      :env/clojars_password}]]
-  :dependencies [[org.clojure/clojure "1.7.0"]
+  :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.cache "0.6.5"]]
   :repositories [["jcenter" {:url "https://jcenter.bintray.com"
                              :snapshots false
                              :checksum :fail
                              :update :always}]]
   :profiles {:dev {:resource-paths ["test/resources"]
+                   :plugins [[jonase/eastwood "0.3.3"]]
                    :dependencies [[ring/ring-jetty-adapter "1.4.0"]
                                   [ring/ring-mock "0.3.0"]
                                   [io.tus.java.client/tus-java-client "0.3.1"]]}
