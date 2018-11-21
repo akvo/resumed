@@ -211,30 +211,28 @@
 
 (deftest google-cloud-load-balancer-complience
   (testing "Lack of x-forwarded-host should fallback on host header"
-    (let [req {:headers {"host"                  "www.akvo.org"
-                         "x-forwarded-proto"     "https"}
-               :uri     "/path"
-               :server-port 3000
-               :scheme :http}
-          req-2 (update req :headers dissoc "x-forwarded-proto")
-          req-3 {:headers {"host" "localhost:3030"}
-                 :uri "/path"
-                 :server-port 4000
-                 :scheme :http}
-          req-4 {:headers {"host" "some.tld"}
-                 :uri "/path"
-                 :server-port 4000
-                 :scheme :http}
-          req-5 {:headers {"host" "some.tld"}
-                 :uri "/path"
-                 :server-port 8443
-                 :scheme :https}]
-      (are [x y] (= x y)
-        "https://www.akvo.org/path" (get-location req)
-        "http://www.akvo.org:3000/path" (get-location req-2)
-        "http://localhost:3030/path" (get-location req-3)
-        "http://some.tld:4000/path" (get-location req-4)
-        "https://some.tld:8443/path" (get-location req-5)))))
+    (are [x y] (= x (get-location y))
+      "https://www.akvo.org/path" {:headers {"host" "www.akvo.org"
+                                             "x-forwarded-proto" "https"}
+                                   :uri "/path"
+                                   :server-port 3000
+                                   :scheme :http}
+      "http://www.akvo.org:3000/path" {:headers {"host" "www.akvo.org"}
+                                       :uri "/path"
+                                       :server-port 3000
+                                       :scheme :http}
+      "http://localhost:3030/path" {:headers {"host" "localhost:3030"}
+                                    :uri "/path"
+                                    :server-port 4000
+                                    :scheme :http}
+      "http://some.tld:4000/path" {:headers {"host" "some.tld"}
+                                   :uri "/path"
+                                   :server-port 4000
+                                   :scheme :http}
+      "https://some.tld:8443/path" {:headers {"host" "some.tld"}
+                                    :uri "/path"
+                                    :server-port 8443
+                                    :scheme :https})))
 
 (deftest check-upload-length
   (testing "Restrict the number of PATCH requests to the Upload-Length"
