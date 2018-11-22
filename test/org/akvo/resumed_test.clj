@@ -36,10 +36,10 @@
     (is (= "max-age=0" (get-header {:params {} :headers {"tus-resumable" "1.0.0"
                                                          "connection"    "keep-alive"
                                                          "cache-control" "max-age=0"}} "Cache-Control")))
-    (is (= "https://mysecure-host.org/files" (get-location (m/request :get "https://mysecure-host.org/files"))))
-    (is (= "http://localhost:3000/files" (get-location (m/request :get "http://localhost:3000/files"))))
-    (is (= "https://some-secure-server/files" (get-location (m/request :get "https://some-secure-server:443/files"))))
-    (is (= "http://localhost/files" (get-location (m/request :get "http://localhost:80/files"))))))
+    (is (= "https://mysecure-host.org/files" (location (m/request :get "https://mysecure-host.org/files"))))
+    (is (= "http://localhost:3000/files" (location (m/request :get "http://localhost:3000/files"))))
+    (is (= "https://some-secure-server/files" (location (m/request :get "https://some-secure-server:443/files"))))
+    (is (= "http://localhost/files" (location (m/request :get "http://localhost:80/files"))))))
 
 (deftest test-options
   (let [handler (make-handler)
@@ -150,7 +150,7 @@
       (is (= 413 (:status resp)))
       (is (nil? location)))))
 
-(defn port [jetty]
+(defn jetty-port [jetty]
   (-> jetty
       .getConnectors
       first
@@ -161,7 +161,7 @@
     (let [handler (make-handler)
           srv (jetty/run-jetty handler {:port 0 :join? false})]
       (try
-        (let [port (port srv)
+        (let [port (jetty-port srv)
               client (TusClient.)
               _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
               _ (.enableResuming client (TusURLMemoryStore.))
@@ -183,7 +183,7 @@
     (let [handler (make-handler)
           srv (jetty/run-jetty handler {:port 0 :join? false})]
       (try
-        (let [port (port srv)
+        (let [port (jetty-port srv)
               client (TusClient.)
               _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
               _ (.enableResuming client (TusURLMemoryStore.))
@@ -211,7 +211,7 @@
 
 (deftest google-cloud-load-balancer-complience
   (testing "Lack of x-forwarded-host should fallback on host header"
-    (are [x y] (= x (get-location y))
+    (are [x y] (= x (location y))
       "https://www.akvo.org/path" {:headers {"host" "www.akvo.org"
                                              "x-forwarded-proto" "https"}
                                    :uri "/path"

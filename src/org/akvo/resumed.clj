@@ -120,52 +120,47 @@
             (DatatypeConverter/parseBase64Binary)
             (String.))))))
 
-(defn get-host
+(defn host
   "Returns the HOST for a given request
   It attempts to honor: X-Forwared-Host, Origin, Host headers"
   [req]
-  (let [host (or (get-header req "x-forwarded-host")
-                 (get-header req "origin")
-                 (first (.split (or (get-header req "host") "") ":")))]
-    (if (str/blank? host)
-      (:server-name req)
-      host)))
+  (or (get-header req "x-forwarded-host")
+      (get-header req "origin")
+      (some-> req (get-header "host") (.split ":") first)
+      (:server-name req)))
 
-(defn get-protocol
+(defn protocol
   "Returns the protocol #{\"http\" \"https\"} for a given request"
   [req]
   (let [forwarded-proto (get-header req "x-forwarded-proto")
         known-protocols #{"http" "https"}]
-    (if (or (str/blank? forwarded-proto)
-            (not (known-protocols forwarded-proto)))
+    (if (not (known-protocols forwarded-proto))
       (name (:scheme req))
       forwarded-proto)))
 
 (def ^:const http-default-ports #{443 80})
 
-(defn get-port
+(defn port
   "Returns the port of the request,
   Empty if port is 80, 443 as those are default ports
   Empty for forwared requests (server behind a proxy)"
   [req]
   (let [forwarded (or (get-header req "x-forwarded-host")
                       (get-header req "x-forwarded-proto"))
-        host (get-header req "host")]
+        fallback (str ":" (:server-port req))]
     (if (or forwarded
             (http-default-ports (:server-port req)))
       ""
-      (if (and host (.contains host ":"))
+      (if-let [host (get-header req "host")]
+        (if (.contains host ":")
           (re-find #":\d+" host)
-          (str ":" (:server-port req))))))
+          fallback)
+        fallback))))
 
-(defn get-location
+(defn location
   "Get Location string from request"
   [req]
-  (let [host (get-host req)
-        proto (get-protocol req)
-        port (get-port req)
-        uri (:uri req)]
-    (format "%s://%s%s%s" proto host port uri)))
+  (format "%s://%s%s%s" (protocol req) (host req) (port req) (:uri req)))
 
 (defn post
   [req {:keys [save-path upload-cache max-upload-size]}]
@@ -189,7 +184,7 @@
                                             :length len
                                             :metadata um})
               {:status 201
-               :headers {"Location" (str (get-location req) "/" id)
+               :headers {"Location" (str (location req) "/" id)
                          "Upload-Length" (str len)
                          "Upload-Metadata" um}}))))
 
