@@ -129,14 +129,15 @@
       (some-> req (get-header "host") (.split ":") first)
       (:server-name req)))
 
+(def ^:const known-protocols #{"http" "https"})
+
 (defn protocol
   "Returns the protocol #{\"http\" \"https\"} for a given request"
   [req]
-  (let [forwarded-proto (get-header req "x-forwarded-proto")
-        known-protocols #{"http" "https"}]
-    (if (not (known-protocols forwarded-proto))
-      (name (:scheme req))
-      forwarded-proto)))
+  (let [forwarded-proto (get-header req "x-forwarded-proto")]
+    (if (known-protocols forwarded-proto)
+      forwarded-proto
+      (name (:scheme req)))))
 
 (def ^:const http-default-ports #{443 80})
 
