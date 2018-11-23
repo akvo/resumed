@@ -36,10 +36,10 @@
     (is (= "max-age=0" (get-header {:params {} :headers {"tus-resumable" "1.0.0"
                                                          "connection"    "keep-alive"
                                                          "cache-control" "max-age=0"}} "Cache-Control")))
-    (is (= "https://mysecure-host.org/files" (get-location (m/request :get "https://mysecure-host.org/files"))))
-    (is (= "http://localhost:3000/files" (get-location (m/request :get "http://localhost:3000/files"))))
-    (is (= "https://some-secure-server/files" (get-location (m/request :get "https://some-secure-server:443/files"))))
-    (is (= "http://localhost/files" (get-location (m/request :get "http://localhost:80/files"))))))
+    (is (= "https://mysecure-host.org/files" (location (m/request :get "https://mysecure-host.org/files"))))
+    (is (= "http://localhost:3000/files" (location (m/request :get "http://localhost:3000/files"))))
+    (is (= "https://some-secure-server/files" (location (m/request :get "https://some-secure-server:443/files"))))
+    (is (= "http://localhost/files" (location (m/request :get "http://localhost:80/files"))))))
 
 (deftest test-options
   (let [handler (make-handler)
@@ -150,7 +150,7 @@
       (is (= 413 (:status resp)))
       (is (nil? location)))))
 
-(defn port [jetty]
+(defn jetty-port [jetty]
   (-> jetty
       .getConnectors
       first
@@ -161,7 +161,7 @@
     (let [handler (make-handler)
           srv (jetty/run-jetty handler {:port 0 :join? false})]
       (try
-        (let [port (port srv)
+        (let [port (jetty-port srv)
               client (TusClient.)
               _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
               _ (.enableResuming client (TusURLMemoryStore.))
@@ -183,7 +183,7 @@
     (let [handler (make-handler)
           srv (jetty/run-jetty handler {:port 0 :join? false})]
       (try
-        (let [port (port srv)
+        (let [port (jetty-port srv)
               client (TusClient.)
               _ (.setUploadCreationURL client (URL. (format "http://localhost:%s/" port)))
               _ (.enableResuming client (TusURLMemoryStore.))
@@ -211,18 +211,28 @@
 
 (deftest google-cloud-load-balancer-complience
   (testing "Lack of x-forwarded-host should fallback on host header"
-    (let [req {:headers {"accept"                "*/*"
-                         "accept-encoding"       "gzip, deflate"
-                         "connection"            "Keep-Alive"
-                         "host"                  "www.akvo.org"
-                         "user-agent"            "."
-                         "via"                   "1.1 google"
-                         "x-cloud-trace-context" ""
-                         "x-forwarded-for"       "0.0.0.0, 127.0.0.1"
-                         "x-forwarded-proto"     "https"}
-               :uri     "/path"}]
-      (is (= "https://www.akvo.org/path"
-             (get-location req))))))
+    (are [x y] (= x (location y))
+      "https://www.akvo.org/path" {:headers {"host" "www.akvo.org"
+                                             "x-forwarded-proto" "https"}
+                                   :uri "/path"
+                                   :server-port 3000
+                                   :scheme :http}
+      "http://www.akvo.org:3000/path" {:headers {"host" "www.akvo.org"}
+                                       :uri "/path"
+                                       :server-port 3000
+                                       :scheme :http}
+      "http://localhost:3030/path" {:headers {"host" "localhost:3030"}
+                                    :uri "/path"
+                                    :server-port 4000
+                                    :scheme :http}
+      "http://some.tld:4000/path" {:headers {"host" "some.tld"}
+                                   :uri "/path"
+                                   :server-port 4000
+                                   :scheme :http}
+      "https://some.tld:8443/path" {:headers {"host" "some.tld"}
+                                    :uri "/path"
+                                    :server-port 8443
+                                    :scheme :https})))
 
 (deftest check-upload-length
   (testing "Restrict the number of PATCH requests to the Upload-Length"
