@@ -125,7 +125,6 @@
   It attempts to honor: X-Forwared-Host, Origin, Host headers"
   [req]
   (or (get-header req "x-forwarded-host")
-      (get-header req "origin")
       (some-> req (get-header "host") (.split ":") first)
       (:server-name req)))
 
@@ -161,7 +160,8 @@
 (defn location
   "Get Location string from request"
   [req]
-  (format "%s://%s%s%s" (protocol req) (host req) (port req) (:uri req)))
+  (or (some-> req (get-header "origin") (str (:uri req)))
+      (format "%s://%s%s%s" (protocol req) (host req) (port req) (:uri req))))
 
 (defn post
   [req {:keys [save-path upload-cache max-upload-size]}]
