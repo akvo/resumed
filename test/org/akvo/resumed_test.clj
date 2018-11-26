@@ -1,13 +1,13 @@
 (ns org.akvo.resumed-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.java.io :as io]
+            [clojure.test :refer :all]
             [org.akvo.resumed :refer :all]
-            [ring.mock.request :as m]
-            [clojure.java.io :as io]
-            [ring.adapter.jetty :as jetty])
-  (:import java.io.File
-           java.net.URL
-           [io.tus.java.client TusClient TusUpload
-                               TusUploader TusURLMemoryStore]))
+            [ring.adapter.jetty :as jetty]
+            [ring.mock.request :as m])
+  (:import [io.tus.java.client TusClient TusUpload
+            TusUploader TusURLMemoryStore]
+           java.io.File
+           java.net.URL))
 
 (defn res-to-byte-array
   "Reads a resource file to a byte array
@@ -232,7 +232,13 @@
       "https://some.tld:8443/path" {:headers {"host" "some.tld"}
                                     :uri "/path"
                                     :server-port 8443
-                                    :scheme :https})))
+                                    :scheme :https}
+      "http://t1.lumen.local:3030/api/files" {:headers {"host" "t1.lumen.local:3030"
+                                                        "origin" "http://t1.lumen.local:3030"}
+                                              :uri "/api/files"
+                                              :server-port 3000
+                                              :scheme :http})))
+
 
 (deftest check-upload-length
   (testing "Restrict the number of PATCH requests to the Upload-Length"
